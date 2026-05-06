@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -11,14 +11,14 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("auth/register.html", {"request": request})
+    return templates.TemplateResponse(request, "auth/register.html")
 
 @router.post("/register")
 def register(request: Request, username: str = Form(...), email: str = Form(...),
              password: str = Form(...), db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == username).first():
-        return templates.TemplateResponse("auth/register.html",
-            {"request": request, "error": "Username already taken"})
+        return templates.TemplateResponse(request, "auth/register.html",
+            {"error": "Username already taken"})
     user = User(username=username, email=email, hashed_password=hash_password(password))
     db.add(user)
     db.commit()
@@ -26,7 +26,7 @@ def register(request: Request, username: str = Form(...), email: str = Form(...)
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("auth/login.html", {"request": request})
+    return templates.TemplateResponse(request, "auth/login.html")
 
 @router.post("/login")
 def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
