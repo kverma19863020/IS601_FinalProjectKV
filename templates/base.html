@@ -3,24 +3,40 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Calculations App</title>
+  <title>{% block title %}Calculation World{% endblock %} | IS601</title>
   <link rel="stylesheet" href="/static/css/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet"/>
 </head>
 <body>
-  <nav>
-    <a href="/calculations">My Calculations</a>
-    {% if user is defined and user %}
-      <span>Hello, {{ user.username }}</span>
-      <form method="post" action="/logout" style="display:inline">
-        <button type="submit">Logout</button>
-      </form>
-    {% else %}
-      <a href="/login">Login</a>
-      <a href="/register">Register</a>
-    {% endif %}
+  <div class="stars" id="stars"></div>
+
+  {% if user is defined and user %}
+  <nav class="navbar">
+    <div class="nav-brand">⚡ Calculation World</div>
+    <div class="nav-links">
+      <a href="/dashboard" class="nav-link {% if request.url.path=='/dashboard' %}active{% endif %}">🏠 Hub</a>
+      <a href="/calculator" class="nav-link {% if request.url.path=='/calculator' %}active{% endif %}">🧮 Calc</a>
+      <a href="/history"    class="nav-link {% if request.url.path=='/history'    %}active{% endif %}">📜 History</a>
+      <a href="/profile"    class="nav-link {% if request.url.path=='/profile'    %}active{% endif %}">👤 Profile</a>
+      <a href="/logout" class="nav-link logout">⏻ Logout</a>
+    </div>
+    <div class="xp-badge">⭐ {{ user.username }}</div>
   </nav>
-  <main>
+  {% endif %}
+
+  <main class="main-content">
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+    const el = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;width:${Math.random()*3+1}px;height:${Math.random()*3+1}px;animation-delay:${Math.random()*3}s;animation-duration:${Math.random()*3+2}s`;
+      el.appendChild(s);
+    }
+  </script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>
