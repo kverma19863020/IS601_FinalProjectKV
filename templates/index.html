@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="hero-screen">
+  <div class="hero-glow"></div>
+  <h1 class="hero-title">&#9889; CALC<span class="neon-cyan">QUEST</span></h1>
+  <p class="hero-sub">Advanced calculations. Full history. PDF and Excel export.</p>
+  <div class="hero-btns">
+    <a href="/login" class="btn btn-primary btn-lg pulse-btn">&#9654; LAUNCH</a>
+    <a href="/register" class="btn btn-outline btn-lg">&#8853; REGISTER</a>
+  </div>
+  <div class="feature-row">
+    <div class="feature-pill">&#129518; 7 Operations</div>
+    <div class="feature-pill">&#128220; Full History</div>
+    <div class="feature-pill">&#128196; PDF Export</div>
+    <div class="feature-pill">&#128202; Excel Export</div>
+    <div class="feature-pill">&#128274; Secure Auth</div>
+  </div>
+</div>
+{% endblock %}
