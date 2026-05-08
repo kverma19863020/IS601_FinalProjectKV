@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">👤 PLAYER PROFILE</h1>
+    <p class="page-sub">Manage your account settings</p>
+  </div>
+
+  <div class="auth-card profile-card">
+    {% if message is defined and message %}
+    <div class="alert alert-success">✅ {{ message }}</div>
+    {% endif %}
+    {% if error is defined and error %}
+    <div class="alert alert-error">❌ {{ error }}</div>
+    {% endif %}
+
+    <div class="profile-info">
+      <div class="avatar-circle">{{ user.username[0]|upper }}</div>
+      <div>
+        <div class="profile-name">{{ user.username }}</div>
+        <div class="profile-since">
+          Joined: {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="/profile" class="auth-form">
+      <div class="field-group">
+        <label class="field-label">EMAIL</label>
+        <input type="email" name="email" class="field-input" value="{{ user.email }}" required/>
+      </div>
+      <hr class="divider"/>
+      <p style="color:var(--muted);font-size:.85rem">
+        Leave new password blank to keep your current password.
+      </p>
+      <div class="field-group">
+        <label class="field-label">CURRENT PASSWORD (required to save)</label>
+        <input type="password" name="current_password" class="field-input"
+               placeholder="current password" required/>
+      </div>
+      <div class="field-group">
+        <label class="field-label">NEW PASSWORD (optional)</label>
+        <input type="password" name="new_password" class="field-input"
+               placeholder="leave blank to keep current" minlength="6"/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">💾 SAVE CHANGES</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
