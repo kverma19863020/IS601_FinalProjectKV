@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">📜 CALCULATION HISTORY</h1>
+    <p class="page-sub">All operations — sortable, filterable, exportable</p>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.total }}</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ "%.2f"|format(stats.avg_result) if stats.avg_result is not none else "N/A" }}</div>
+      <div class="stat-label">Avg Result</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.most_used_op|upper if stats.most_used_op else "N/A" }}</div>
+      <div class="stat-label">Top Op</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <input type="text" id="search" class="field-input search-box"
+             placeholder="🔍 Filter..." oninput="filterTable()"/>
+      <select id="opFilter" class="field-input sel-box" onchange="filterTable()">
+        <option value="">All Operations</option>
+        <option value="add">Addition</option>
+        <option value="subtract">Subtraction</option>
+        <option value="multiply">Multiplication</option>
+        <option value="divide">Division</option>
+        <option value="power">Power</option>
+        <option value="modulus">Modulus</option>
+        <option value="sqrt_a">Square Root</option>
+      </select>
+    </div>
+    <div class="toolbar-right">
+      <a href="/history/export/csv"   class="btn btn-outline btn-sm">📊 CSV</a>
+      <a href="/history/export/excel" class="btn btn-outline btn-sm">📗 Excel</a>
+      <a href="/history/export/pdf"   class="btn btn-outline btn-sm">📄 PDF</a>
+    </div>
+  </div>
+
+  {% if records %}
+  <div class="table-wrap">
+    <table class="data-table" id="histTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">#</th>
+          <th onclick="sortTable(1)">Operation</th>
+          <th onclick="sortTable(2)">A</th>
+          <th onclick="sortTable(3)">B</th>
+          <th onclick="sortTable(4)">Result</th>
+          <th onclick="sortTable(5)">Date &amp; Time</th>
+        </tr>
+      </thead>
+      <tbody id="tBody">
+        {% for r in records %}
+        <tr data-op="{{ r.operation }}">
+          <td>{{ r.id }}</td>
+          <td><span class="op-badge op-{{ r.operation }}">{{ r.operation|upper }}</span></td>
+          <td>{{ r.operand_a }}</td>
+          <td>{{ r.operand_b }}</td>
+          <td class="td-result">{{ "%.4f"|format(r.result) }}</td>
+          <td class="td-time">{{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else 'N/A' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer">
+    Showing <span id="visCount">{{ records|length }}</span> of {{ records|length }} records
+  </div>
+  {% else %}
+  <div class="section-card" style="text-align:center;color:var(--muted)">
+    No calculations yet. <a href="/calculator" class="neon-cyan">Run your first one →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterTable() {
+  const q  = document.getElementById('search').value.toLowerCase();
+  const op = document.getElementById('opFilter').value;
+  let vis  = 0;
+  document.querySelectorAll('#tBody tr').forEach(r => {
+    const ok = (!q || r.textContent.toLowerCase().includes(q)) && (!op || r.dataset.op === op);
+    r.style.display = ok ? '' : 'none';
+    if (ok) vis++;
+  });
+  document.getElementById('visCount').textContent = vis;
+}
+let sortDir = {};
+function sortTable(col) {
+  const tbody = document.getElementById('tBody');
+  const rows  = [...tbody.querySelectorAll('tr')];
+  const asc   = (sortDir[col] = !sortDir[col]);
+  rows.sort((a, b) => {
+    const av = a.cells[col].textContent.trim();
+    const bv = b.cells[col].textContent.trim();
+    const n  = parseFloat(av) - parseFloat(bv);
+    return asc ? (isNaN(n) ? av.localeCompare(bv) : n)
+               : (isNaN(n) ? bv.localeCompare(av) : -n);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}
