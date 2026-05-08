@@ -4,8 +4,15 @@
 <div class="page-wrap">
   <div class="page-header">
     <h1 class="page-title">📜 CALCULATION HISTORY</h1>
-    <p class="page-sub">All operations — sortable, filterable, exportable</p>
+    <p class="page-sub">Browse, edit, delete, and export your calculations</p>
   </div>
+
+  {% if request.query_params.get('deleted') %}
+  <div class="alert alert-success">✅ Calculation deleted successfully.</div>
+  {% endif %}
+  {% if request.query_params.get('edited') %}
+  <div class="alert alert-success">✅ Calculation updated successfully.</div>
+  {% endif %}
 
   <div class="stats-row">
     <div class="stat-card">
@@ -55,6 +62,7 @@
           <th onclick="sortTable(3)">B</th>
           <th onclick="sortTable(4)">Result</th>
           <th onclick="sortTable(5)">Date &amp; Time</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody id="tBody">
@@ -65,7 +73,20 @@
           <td>{{ r.operand_a }}</td>
           <td>{{ r.operand_b }}</td>
           <td class="td-result">{{ "%.4f"|format(r.result) }}</td>
-          <td class="td-time">{{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else 'N/A' }}</td>
+          <td class="td-time">
+            {{ r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else 'N/A' }}
+          </td>
+          <td class="td-actions">
+            <a href="/calculation/{{ r.id }}"
+               class="action-btn action-view" title="View">👁</a>
+            <a href="/calculation/{{ r.id }}/edit"
+               class="action-btn action-edit" title="Edit">✏️</a>
+            <form method="post" action="/calculation/{{ r.id }}/delete"
+                  style="display:inline"
+                  onsubmit="return confirm('Delete this calculation?')">
+              <button type="submit" class="action-btn action-delete" title="Delete">🗑️</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

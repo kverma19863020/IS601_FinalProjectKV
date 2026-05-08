@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Edit Calculation #{{ calc.id }}{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">✏️ EDIT CALCULATION</h1>
+    <p class="page-sub">Modify record #{{ calc.id }}</p>
+  </div>
+  <div class="auth-card" style="max-width:500px;margin:0 auto">
+    {% if error is defined and error %}
+    <div class="alert alert-error">❌ {{ error }}</div>
+    {% endif %}
+    <form method="post" action="/calculation/{{ calc.id }}/edit" class="auth-form">
+      <div class="field-group">
+        <label class="field-label">OPERATION</label>
+        <select name="operation" class="field-input">
+          {% for op in ['add','subtract','multiply','divide','power','modulus','sqrt_a'] %}
+          <option value="{{ op }}" {% if calc.operation == op %}selected{% endif %}>
+            {{ op|upper }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">VALUE A</label>
+        <input type="number" name="a" step="any" class="field-input calc-num"
+               value="{{ calc.operand_a }}" required/>
+      </div>
+      <div class="field-group">
+        <label class="field-label">VALUE B</label>
+        <input type="number" name="b" step="any" class="field-input calc-num"
+               value="{{ calc.operand_b }}" required/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">💾 SAVE CHANGES</button>
+    </form>
+    <a href="/history"
+       class="btn btn-outline btn-full"
+       style="margin-top:.7rem">← Cancel</a>
+  </div>
+</div>
+{% endblock %}

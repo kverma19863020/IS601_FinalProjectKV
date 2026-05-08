@@ -422,3 +422,28 @@ select.field-input { cursor: pointer; }
   .toolbar    { flex-direction: column; align-items: stretch; }
   .search-box, .sel-box { max-width: 100%; }
 }
+
+/* ── BREAD action buttons in table ──────────────────────────── */
+.td-actions { white-space: nowrap; }
+.action-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  font-size: .85rem; cursor: pointer; border: none;
+  background: var(--bg3); text-decoration: none;
+  transition: background .15s; margin-right: 2px;
+}
+.action-view:hover   { background: rgba(57,208,240,.2); }
+.action-edit:hover   { background: rgba(210,153,34,.2); }
+.action-delete:hover { background: rgba(248,81,73,.2); }
+
+/* ── Detail page rows ───────────────────────────────────────── */
+.detail-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .65rem 0; border-bottom: 1px solid var(--border);
+}
+.detail-row:last-of-type { border-bottom: none; }
+.detail-label {
+  font-size: .7rem; font-weight: 700; letter-spacing: .1em;
+  color: var(--muted); text-transform: uppercase;
+}
+.detail-val { color: var(--text); font-size: .95rem; font-weight: 600; }
