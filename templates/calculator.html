@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Calculator{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">🧮 CALCULATION ENGINE</h1>
+    <p class="page-sub">Pick an operation, enter values, fire!</p>
+  </div>
+
+  <div class="op-grid">
+    {% set ops=[
+      ("add",      "+",    "Addition",       "a + b"),
+      ("subtract", "−",    "Subtraction",    "a − b"),
+      ("multiply", "×",    "Multiplication", "a × b"),
+      ("divide",   "÷",    "Division",       "a ÷ b"),
+      ("power",    "^",    "Exponentiation", "a ^ b"),
+      ("modulus",  "mod",  "Modulus",        "a mod b"),
+      ("sqrt_a",   "√",    "Square Root",    "√a")
+    ] %}
+    {% for op_id, icon, label, expr in ops %}
+    <div class="op-tile {% if operation is defined and operation == op_id %}selected{% endif %}"
+         data-op="{{ op_id }}" onclick="selectOp('{{ op_id }}')">
+      <div class="op-tile-icon">{{ icon }}</div>
+      <div class="op-tile-label">{{ label }}</div>
+      <div class="op-tile-expr">{{ expr }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="/calculate" class="calc-form">
+    <input type="hidden" name="operation" id="operationInput"
+           value="{{ operation if operation is defined else 'add' }}"/>
+    <div class="calc-row">
+      <div class="field-group" style="flex:1">
+        <label class="field-label">VALUE A</label>
+        <input type="number" name="a" step="any" class="field-input calc-num"
+               value="{{ a if a is defined else '' }}" placeholder="0" required/>
+      </div>
+      <div class="op-symbol" id="opSymbol">+</div>
+      <div class="field-group" style="flex:1">
+        <label class="field-label">VALUE B</label>
+        <input type="number" name="b" step="any" class="field-input calc-num"
+               value="{{ b if b is defined else '' }}" placeholder="0" required/>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-full btn-lg pulse-btn">
+      ⚡ CALCULATE
+    </button>
+  </form>
+
+  {% if result is defined and result is not none %}
+  <div class="result-box result-ok" id="resultBox">
+    <div class="result-label">RESULT</div>
+    <div class="result-value">{{ "%.6g"|format(result) }}</div>
+    <div class="result-expr">{{ a }} {{ operation|upper }} {{ b }} = {{ "%.6g"|format(result) }}</div>
+  </div>
+  {% elif error is defined and error %}
+  <div class="result-box result-err">
+    <div class="result-label">ERROR</div>
+    <div class="result-value">⚠️</div>
+    <div class="result-expr">{{ error }}</div>
+  </div>
+  {% endif %}
+
+  <div class="explainer-box">
+    <div class="explainer-title">📖 HOW IT WORKS</div>
+    <div class="explainer-body" id="explainerBody">
+      Select an operation above to see its explanation.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SYM = {
+  add: "+", subtract: "−", multiply: "×", divide: "÷",
+  power: "^", modulus: "mod", sqrt_a: "√"
+};
+const EXP = {
+  add:      "<strong>Addition (a + b)</strong><br>Combines two numbers into their sum.<br><em>Example: 12 + 7 = 19</em>",
+  subtract: "<strong>Subtraction (a − b)</strong><br>Finds the difference between two numbers.<br><em>Example: 20 − 8 = 12</em>",
+  multiply: "<strong>Multiplication (a × b)</strong><br>Repeated addition — scales one number by another.<br><em>Example: 6 × 7 = 42</em>",
+  divide:   "<strong>Division (a ÷ b)</strong><br>Splits a into b equal parts. Undefined when b = 0.<br><em>Example: 15 ÷ 3 = 5</em>",
+  power:    "<strong>Exponentiation (a ^ b)</strong><br>Raises a to the power of b — a multiplied by itself b times.<br><em>Example: 2 ^ 10 = 1024</em>",
+  modulus:  "<strong>Modulus (a mod b)</strong><br>Returns the remainder after dividing a by b. Used in cryptography and hashing.<br><em>Example: 17 mod 5 = 2</em>",
+  sqrt_a:   "<strong>Square Root (√a)</strong><br>Finds the number that multiplied by itself equals a. Value of b is ignored.<br><em>Example: √144 = 12</em>"
+};
+
+function selectOp(op) {
+  document.querySelectorAll('.op-tile').forEach(t => t.classList.remove('selected'));
+  document.querySelector('.op-tile[data-op="' + op + '"]').classList.add('selected');
+  document.getElementById('operationInput').value = op;
+  document.getElementById('opSymbol').textContent = SYM[op] || op;
+  document.getElementById('explainerBody').innerHTML = EXP[op] || '';
+}
+
+const init = document.getElementById('operationInput').value;
+if (init) selectOp(init);
+
+const rb = document.getElementById('resultBox');
+if (rb) {
+  rb.style.opacity = 0;
+  setTimeout(() => { rb.style.transition = 'opacity .6s'; rb.style.opacity = 1; }, 80);
+}
+</script>
+{% endblock %}
