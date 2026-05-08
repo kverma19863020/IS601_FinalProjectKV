@@ -11,3 +11,5 @@ test-results/
 *.egg-info/
 dist/
 .DS_Store
+htmlcov/
+.coverage
