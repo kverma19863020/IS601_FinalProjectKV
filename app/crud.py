@@ -1,26 +1,28 @@
 """
-CRUD operations for Calculation World
-Covers: Users and Calculations (full BREAD support)
+CRUD operations for Calculation World (CLO11).
+Implements full BREAD: Browse, Read, Edit, Add, Delete for calculations.
+All database interactions are encapsulated here — routes stay thin.
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app import models, schemas, auth
 
 
-# ── User operations ───────────────────────────────────────────
-
 def get_user_by_username(db: Session, username: str):
-    """Fetch user by username."""
+    """Fetch a user by their username. Returns None if not found."""
     return db.query(models.User).filter(models.User.username == username).first()
 
 
 def get_user_by_email(db: Session, email: str):
-    """Fetch user by email address."""
+    """Fetch a user by their email address. Returns None if not found."""
     return db.query(models.User).filter(models.User.email == email).first()
 
 
 def create_user(db: Session, data: schemas.UserCreate):
-    """Create new user with hashed password."""
+    """
+    Create a new user account.
+    Password is hashed with bcrypt before storage — never stored in plain text.
+    """
     user = models.User(
         username=data.username,
         email=data.email,
@@ -33,15 +35,20 @@ def create_user(db: Session, data: schemas.UserCreate):
 
 
 def authenticate_user(db: Session, username: str, password: str):
-    """Return user if credentials valid, else None."""
+    """
+    Verify username and password.
+    Returns the User object on success, None on failure.
+    """
     user = get_user_by_username(db, username)
-    if not user or not auth.verify_password(password, user.hashed_password):
+    if not user:
+        return None
+    if not auth.verify_password(password, user.hashed_password):
         return None
     return user
 
 
 def update_email(db: Session, user: models.User, new_email: str):
-    """Update user email address."""
+    """Update a user's email address."""
     user.email = new_email
     db.commit()
     db.refresh(user)
@@ -49,17 +56,15 @@ def update_email(db: Session, user: models.User, new_email: str):
 
 
 def update_password(db: Session, user: models.User, new_password: str):
-    """Hash and update user password."""
+    """Hash and update a user's password."""
     user.hashed_password = auth.hash_password(new_password)
     db.commit()
     db.refresh(user)
     return user
 
 
-# ── Calculation BREAD operations ──────────────────────────────
-
 def create_calculation(db: Session, data: schemas.CalculationCreate):
-    """Add: Save a new calculation result to the database."""
+    """ADD — Save a new calculation result to the database."""
     calc = models.Calculation(**data.model_dump())
     db.add(calc)
     db.commit()
@@ -68,7 +73,7 @@ def create_calculation(db: Session, data: schemas.CalculationCreate):
 
 
 def get_history(db: Session, user_id: int, limit: int = 500):
-    """Browse: Return all calculations for a user, newest first."""
+    """BROWSE — Return all calculations for a user, newest first."""
     return (
         db.query(models.Calculation)
         .filter(models.Calculation.user_id == user_id)
@@ -79,7 +84,7 @@ def get_history(db: Session, user_id: int, limit: int = 500):
 
 
 def get_calculation_by_id(db: Session, calc_id: int, user_id: int):
-    """Read: Fetch a single calculation by ID, scoped to user."""
+    """READ — Fetch a single calculation by ID, scoped to user."""
     return (
         db.query(models.Calculation)
         .filter(
@@ -98,7 +103,7 @@ def update_calculation(
     operation: str,
     result: float,
 ):
-    """Edit: Update an existing calculation with new values."""
+    """EDIT — Update an existing calculation with new values and recalculated result."""
     calc.operand_a = operand_a
     calc.operand_b = operand_b
     calc.operation = operation
@@ -109,13 +114,13 @@ def update_calculation(
 
 
 def delete_calculation(db: Session, calc: models.Calculation):
-    """Delete: Remove a calculation from the database."""
+    """DELETE — Permanently remove a calculation from the database."""
     db.delete(calc)
     db.commit()
 
 
 def get_stats(db: Session, user_id: int) -> dict:
-    """Return aggregate stats for a user's calculations."""
+    """Return aggregate statistics for a user's calculation history."""
     total = (
         db.query(func.count(models.Calculation.id))
         .filter(models.Calculation.user_id == user_id)

@@ -1,3 +1,7 @@
+"""
+SQLAlchemy ORM models for Calculation World.
+Defines User and Calculation tables with proper relationships.
+"""
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -5,6 +9,10 @@ from app.database import Base
 
 
 class User(Base):
+    """
+    User account model.
+    Stores hashed passwords only — never plain text.
+    """
     __tablename__ = "users"
 
     id              = Column(Integer, primary_key=True, index=True)
@@ -19,6 +27,11 @@ class User(Base):
 
 
 class Calculation(Base):
+    """
+    Calculation history model.
+    Stores each operation performed by a user with full operands and result.
+    Supports BREAD: Browse, Read, Edit, Add, Delete.
+    """
     __tablename__ = "calculations"
 
     id         = Column(Integer, primary_key=True, index=True)

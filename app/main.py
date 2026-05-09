@@ -1,8 +1,6 @@
 """
-IS601_FinalProjectKV - Calculation World
-Main FastAPI Application
-Implements: Browse, Read, Edit, Add, Delete (BREAD) for calculations
-Plus: History, Export, Profile, Forgot Username, Reset Password
+Calculation World - IS601 Final Project
+Main FastAPI application with full BREAD operations.
 """
 import io
 import csv
@@ -17,22 +15,32 @@ from app.database import get_db, engine
 from app import models, schemas, crud, auth
 from app.models import Base
 
-# Auto-create all tables on startup
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Calculation World",
-    description="Advanced calculator with full BREAD operations, history, and export",
+    description="Advanced calculator with BREAD operations, history, export, and secure JWT auth.",
     version="1.0.0",
 )
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+OPERATIONS = {
+    "add":      (lambda a, b: a + b,    "+"),
+    "subtract": (lambda a, b: a - b,    "-"),
+    "multiply": (lambda a, b: a * b,    "x"),
+    "divide":   (lambda a, b: a / b,    "/"),
+    "power":    (lambda a, b: a ** b,   "^"),
+    "modulus":  (lambda a, b: a % b,    "mod"),
+    "sqrt_a":   (lambda a, b: a ** 0.5, "sqrt"),
+}
 
-# ── Auth helper ───────────────────────────────────────────────
+ZERO_GUARDED = {"divide", "modulus"}
+
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
-    """Extract and validate JWT from cookie, return User or None."""
+    """Extract JWT from httponly cookie and return authenticated User or None."""
     token = request.cookies.get("access_token")
     if not token:
         return None
@@ -42,11 +50,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     return crud.get_user_by_username(db, username)
 
 
-# ── Public routes ─────────────────────────────────────────────
-
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
-    """Landing page — redirect to dashboard if already logged in."""
     user = get_current_user(request, db)
     if user:
         return RedirectResponse("/dashboard", status_code=302)
@@ -56,9 +61,7 @@ def index(request: Request, db: Session = Depends(get_db)):
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     registered = request.query_params.get("registered")
-    return templates.TemplateResponse(
-        "login.html", {"request": request, "registered": registered}
-    )
+    return templates.TemplateResponse("login.html", {"request": request, "registered": registered})
 
 
 @app.post("/login")
@@ -68,7 +71,6 @@ def login(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Authenticate user, set JWT cookie on success."""
     user = crud.authenticate_user(db, username, password)
     if not user:
         return templates.TemplateResponse(
@@ -77,7 +79,7 @@ def login(
             status_code=400,
         )
     token = auth.create_access_token({"sub": user.username})
-    resp = RedirectResponse("/dashboard", status_code=302)
+    resp  = RedirectResponse("/dashboard", status_code=302)
     resp.set_cookie("access_token", token, httponly=True, max_age=3600)
     return resp
 
@@ -95,7 +97,6 @@ def register(
     password: str = Form(...),
     db: Session   = Depends(get_db),
 ):
-    """Create new user account with hashed password."""
     if crud.get_user_by_username(db, username):
         return templates.TemplateResponse(
             "register.html",
@@ -108,9 +109,7 @@ def register(
             {"request": request, "error": "Email already registered"},
             status_code=400,
         )
-    crud.create_user(
-        db, schemas.UserCreate(username=username, email=email, password=password)
-    )
+    crud.create_user(db, schemas.UserCreate(username=username, email=email, password=password))
     return RedirectResponse("/login?registered=1", status_code=302)
 
 
@@ -120,21 +119,10 @@ def forgot_username_page(request: Request):
 
 
 @app.post("/forgot-username", response_class=HTMLResponse)
-def forgot_username(
-    request: Request,
-    email: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    """Look up username by email address."""
-    user = crud.get_user_by_email(db, email)
-    message = (
-        f"Your username is: {user.username}"
-        if user
-        else "No account found with that email."
-    )
-    return templates.TemplateResponse(
-        "forgot_username.html", {"request": request, "message": message}
-    )
+def forgot_username(request: Request, email: str = Form(...), db: Session = Depends(get_db)):
+    user    = crud.get_user_by_email(db, email)
+    message = f"Your username is: {user.username}" if user else "No account found with that email."
+    return templates.TemplateResponse("forgot_username.html", {"request": request, "message": message})
 
 
 @app.get("/reset-password", response_class=HTMLResponse)
@@ -149,7 +137,6 @@ def reset_password(
     new_password: str = Form(...),
     db: Session       = Depends(get_db),
 ):
-    """Reset password after verifying email exists."""
     user = crud.get_user_by_email(db, email)
     if not user:
         return templates.TemplateResponse(
@@ -165,17 +152,13 @@ def reset_password(
 
 @app.get("/logout")
 def logout():
-    """Clear JWT cookie and redirect to login."""
     resp = RedirectResponse("/login", status_code=302)
     resp.delete_cookie("access_token")
     return resp
 
 
-# ── Protected routes ──────────────────────────────────────────
-
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    """Main dashboard showing stats and recent activity."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -189,13 +172,10 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/calculator", response_class=HTMLResponse)
 def calculator_page(request: Request, db: Session = Depends(get_db)):
-    """Calculator page — ADD operation (Create in BREAD)."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse(
-        "calculator.html", {"request": request, "user": user}
-    )
+    return templates.TemplateResponse("calculator.html", {"request": request, "user": user})
 
 
 @app.post("/calculate", response_class=HTMLResponse)
@@ -206,87 +186,58 @@ def calculate(
     operation: str = Form(...),
     db: Session    = Depends(get_db),
 ):
-    """
-    Execute calculation and save to history (BREAD: Add).
-    Supports: add, subtract, multiply, divide, power, modulus, sqrt_a
-    """
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    OPS = {
-        "add":      (lambda x, y: x + y,    "+"),
-        "subtract": (lambda x, y: x - y,    "−"),
-        "multiply": (lambda x, y: x * y,    "×"),
-        "divide":   (lambda x, y: x / y,    "÷"),
-        "power":    (lambda x, y: x ** y,   "^"),
-        "modulus":  (lambda x, y: x % y,    "mod"),
-        "sqrt_a":   (lambda x, y: x ** 0.5, "√"),
-    }
-
     result = None
     error  = None
 
-    if operation not in OPS:
-        error = "Unknown operation."
-    elif operation in ("divide", "modulus") and b == 0:
+    if operation not in OPERATIONS:
+        error = "Unknown operation selected."
+    elif operation in ZERO_GUARDED and b == 0:
         error = "Cannot divide by zero."
     else:
         try:
-            fn, _ = OPS[operation]
+            fn, _ = OPERATIONS[operation]
             result = fn(a, b)
             crud.create_calculation(
                 db,
                 schemas.CalculationCreate(
-                    user_id=user.id,
-                    operand_a=a,
-                    operand_b=b,
-                    operation=operation,
-                    result=result,
+                    user_id=user.id, operand_a=a, operand_b=b,
+                    operation=operation, result=result,
                 ),
             )
-        except Exception as e:
-            error = str(e)
+        except ZeroDivisionError:
+            error = "Cannot divide by zero."
+        except Exception as exc:
+            error = str(exc)
 
     return templates.TemplateResponse(
         "calculator.html",
-        {
-            "request":   request,
-            "user":      user,
-            "a":         a,
-            "b":         b,
-            "operation": operation,
-            "result":    result,
-            "error":     error,
-        },
+        {"request": request, "user": user, "a": a, "b": b,
+         "operation": operation, "result": result, "error": error},
     )
 
 
-# ── BREAD: Browse ─────────────────────────────────────────────
-
 @app.get("/history", response_class=HTMLResponse)
 def history_page(request: Request, db: Session = Depends(get_db)):
-    """Browse all calculations (BREAD: Browse)."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
     records = crud.get_history(db, user.id)
     stats   = crud.get_stats(db, user.id)
+    deleted = request.query_params.get("deleted")
+    edited  = request.query_params.get("edited")
     return templates.TemplateResponse(
         "history.html",
-        {"request": request, "user": user, "records": records, "stats": stats},
+        {"request": request, "user": user, "records": records,
+         "stats": stats, "deleted": deleted, "edited": edited},
     )
 
 
-# ── BREAD: Read ───────────────────────────────────────────────
-
 @app.get("/calculation/{calc_id}", response_class=HTMLResponse)
-def read_calculation(
-    calc_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Read a single calculation detail (BREAD: Read)."""
+def read_calculation(calc_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -299,15 +250,8 @@ def read_calculation(
     )
 
 
-# ── BREAD: Edit ───────────────────────────────────────────────
-
 @app.get("/calculation/{calc_id}/edit", response_class=HTMLResponse)
-def edit_calculation_page(
-    calc_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Edit calculation form (BREAD: Edit)."""
+def edit_calculation_page(calc_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -329,7 +273,6 @@ def edit_calculation(
     operation: str = Form(...),
     db: Session    = Depends(get_db),
 ):
-    """Save edited calculation and recalculate result (BREAD: Edit)."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -337,28 +280,21 @@ def edit_calculation(
     if not calc:
         raise HTTPException(status_code=404, detail="Calculation not found")
 
-    OPS = {
-        "add":      lambda x, y: x + y,
-        "subtract": lambda x, y: x - y,
-        "multiply": lambda x, y: x * y,
-        "divide":   lambda x, y: x / y,
-        "power":    lambda x, y: x ** y,
-        "modulus":  lambda x, y: x % y,
-        "sqrt_a":   lambda x, y: x ** 0.5,
-    }
-
     error = None
-    if operation not in OPS:
+    if operation not in OPERATIONS:
         error = "Unknown operation."
-    elif operation in ("divide", "modulus") and b == 0:
+    elif operation in ZERO_GUARDED and b == 0:
         error = "Cannot divide by zero."
     else:
         try:
-            result = OPS[operation](a, b)
+            fn, _ = OPERATIONS[operation]
+            result = fn(a, b)
             crud.update_calculation(db, calc, a, b, operation, result)
             return RedirectResponse("/history?edited=1", status_code=302)
-        except Exception as e:
-            error = str(e)
+        except ZeroDivisionError:
+            error = "Cannot divide by zero."
+        except Exception as exc:
+            error = str(exc)
 
     return templates.TemplateResponse(
         "calculation_edit.html",
@@ -366,15 +302,8 @@ def edit_calculation(
     )
 
 
-# ── BREAD: Delete ─────────────────────────────────────────────
-
 @app.post("/calculation/{calc_id}/delete")
-def delete_calculation(
-    calc_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Delete a single calculation (BREAD: Delete)."""
+def delete_calculation(calc_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -385,11 +314,8 @@ def delete_calculation(
     return RedirectResponse("/history?deleted=1", status_code=302)
 
 
-# ── Export routes ─────────────────────────────────────────────
-
 @app.get("/history/export/csv")
 def export_csv(request: Request, db: Session = Depends(get_db)):
-    """Export history as CSV file."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -398,21 +324,17 @@ def export_csv(request: Request, db: Session = Depends(get_db)):
     w   = csv.writer(buf)
     w.writerow(["ID", "Operation", "A", "B", "Result", "Timestamp"])
     for r in records:
-        w.writerow([
-            r.id, r.operation, r.operand_a, r.operand_b, r.result,
-            r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-        ])
+        w.writerow([r.id, r.operation, r.operand_a, r.operand_b, r.result,
+                    r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else ""])
     buf.seek(0)
     return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode()),
-        media_type="text/csv",
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=calc_history.csv"},
     )
 
 
 @app.get("/history/export/pdf")
 def export_pdf(request: Request, db: Session = Depends(get_db)):
-    """Export history as styled PDF using ReportLab."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -425,44 +347,32 @@ def export_pdf(request: Request, db: Session = Depends(get_db)):
     doc   = SimpleDocTemplate(buf, pagesize=letter)
     styl  = getSampleStyleSheet()
     elems = [
-        Paragraph(f"Calculation History — {user.username}", styl["Title"]),
-        Paragraph(
-            f"Exported: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
-            styl["Normal"],
-        ),
+        Paragraph(f"Calculation History - {user.username}", styl["Title"]),
+        Paragraph(f"Exported: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", styl["Normal"]),
         Spacer(1, 20),
     ]
     data = [["#", "Operation", "A", "B", "Result", "Date"]]
     for r in records:
-        data.append([
-            str(r.id), r.operation,
-            str(r.operand_a), str(r.operand_b),
-            f"{r.result:.4f}",
-            r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
-        ])
+        data.append([str(r.id), r.operation, str(r.operand_a), str(r.operand_b),
+                     f"{r.result:.4f}", r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""])
     t = Table(data, colWidths=[30, 70, 70, 70, 80, 120])
     t.setStyle(TableStyle([
-        ("BACKGROUND",     (0, 0), (-1, 0), colors.HexColor("#6c63ff")),
-        ("TEXTCOLOR",      (0, 0), (-1, 0), colors.white),
-        ("FONTNAME",       (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-         [colors.HexColor("#f0eeff"), colors.white]),
-        ("GRID",           (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
-        ("FONTSIZE",       (0, 0), (-1, -1), 9),
+        ("BACKGROUND",     (0,0), (-1,0), colors.HexColor("#6c63ff")),
+        ("TEXTCOLOR",      (0,0), (-1,0), colors.white),
+        ("FONTNAME",       (0,0), (-1,0), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.HexColor("#f0eeff"), colors.white]),
+        ("GRID",           (0,0), (-1,-1), 0.5, colors.HexColor("#cccccc")),
+        ("FONTSIZE",       (0,0), (-1,-1), 9),
     ]))
     elems.append(t)
     doc.build(elems)
     buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=calc_history.pdf"},
-    )
+    return StreamingResponse(buf, media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=calc_history.pdf"})
 
 
 @app.get("/history/export/excel")
 def export_excel(request: Request, db: Session = Depends(get_db)):
-    """Export history as styled Excel file using openpyxl."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -473,12 +383,12 @@ def export_excel(request: Request, db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Calculation History"
     headers = ["ID", "Operation", "A", "B", "Result", "Timestamp"]
-    hf = Font(bold=True, color="FFFFFF")
-    hb = PatternFill("solid", fgColor="6C63FF")
-    for c, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=c, value=h)
-        cell.font = hf
-        cell.fill = hb
+    hfont = Font(bold=True, color="FFFFFF")
+    hfill = PatternFill("solid", fgColor="6C63FF")
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = hfont
+        cell.fill = hfill
         cell.alignment = Alignment(horizontal="center")
     for i, r in enumerate(records, 2):
         ws.cell(row=i, column=1, value=r.id)
@@ -486,34 +396,23 @@ def export_excel(request: Request, db: Session = Depends(get_db)):
         ws.cell(row=i, column=3, value=r.operand_a)
         ws.cell(row=i, column=4, value=r.operand_b)
         ws.cell(row=i, column=5, value=round(r.result, 4))
-        ws.cell(
-            row=i, column=6,
-            value=r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-        )
+        ws.cell(row=i, column=6, value=r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "")
     for col in ws.columns:
-        ws.column_dimensions[col[0].column_letter].width = (
-            max(len(str(c.value or "")) for c in col) + 4
-        )
+        ws.column_dimensions[col[0].column_letter].width = max(len(str(c.value or "")) for c in col) + 4
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return StreamingResponse(
-        buf,
+    return StreamingResponse(buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=calc_history.xlsx"},
-    )
+        headers={"Content-Disposition": "attachment; filename=calc_history.xlsx"})
 
-
-# ── Profile ───────────────────────────────────────────────────
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse(
-        "profile.html", {"request": request, "user": user}
-    )
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user})
 
 
 @app.post("/profile", response_class=HTMLResponse)
@@ -524,7 +423,6 @@ def update_profile(
     new_password: str     = Form(""),
     db: Session           = Depends(get_db),
 ):
-    """Update email and optionally change password."""
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -542,11 +440,8 @@ def update_profile(
     )
 
 
-# ── REST API endpoints ────────────────────────────────────────
-
 @app.get("/api/history", response_model=list[schemas.CalculationOut])
 def api_history(request: Request, db: Session = Depends(get_db)):
-    """REST API: get all calculations for current user."""
     user = get_current_user(request, db)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -559,43 +454,26 @@ def api_calculate(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """REST API: run a calculation and save to history."""
     user = get_current_user(request, db)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    OPS = {
-        "add":      lambda a, b: a + b,
-        "subtract": lambda a, b: a - b,
-        "multiply": lambda a, b: a * b,
-        "divide":   lambda a, b: a / b,
-        "power":    lambda a, b: a ** b,
-        "modulus":  lambda a, b: a % b,
-        "sqrt_a":   lambda a, b: a ** 0.5,
-    }
-    if payload.operation not in OPS:
+    if payload.operation not in OPERATIONS:
         raise HTTPException(status_code=400, detail="Unknown operation")
-    if payload.operation in ("divide", "modulus") and payload.operand_b == 0:
+    if payload.operation in ZERO_GUARDED and payload.operand_b == 0:
         raise HTTPException(status_code=400, detail="Cannot divide by zero")
-    result = OPS[payload.operation](payload.operand_a, payload.operand_b)
+    fn, _ = OPERATIONS[payload.operation]
+    result = fn(payload.operand_a, payload.operand_b)
     return crud.create_calculation(
         db,
         schemas.CalculationCreate(
-            user_id=user.id,
-            operand_a=payload.operand_a,
-            operand_b=payload.operand_b,
-            operation=payload.operation,
-            result=result,
+            user_id=user.id, operand_a=payload.operand_a,
+            operand_b=payload.operand_b, operation=payload.operation, result=result,
         ),
     )
 
 
 @app.delete("/api/calculation/{calc_id}")
-def api_delete_calculation(
-    calc_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """REST API: delete a calculation by ID."""
+def api_delete_calculation(calc_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
